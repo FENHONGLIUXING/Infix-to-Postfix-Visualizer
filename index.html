@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中缀转后缀表达式 - 交互模拟器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .stack-item {
+            transition: all 0.3s ease;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .highlight {
+            background-color: #fef3c7;
+            border: 2px solid #f59e0b;
+        }
+
+        .char-box {
+            display: inline-flex;
+            width: 40px;
+            height: 40px;
+            align-items: center;
+            justify-content: center;
+            margin: 2px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 min-h-screen p-4 md:p-8">
+    <div class="max-w-4xl mx-auto">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-slate-800 mb-2">中缀转后缀 (栈模拟) 演示</h1>
+            <p class="text-slate-600">可视化理解算法逻辑：操作数直接输出，运算符按优先级入栈</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Left control panel -->
+            <div class="lg:col-span-1 space-y-4">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">输入中缀表达式</label>
+                    <input type="text" id="expressionInput" value="a+b*c+(d*e+f)*g"
+                        class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-lg">
+
+                    <div class="grid grid-cols-2 gap-2 mt-4">
+                        <button onclick="reset()"
+                            class="bg-slate-200 hover:bg-slate-300 text-slate-700 py-2 rounded-lg font-medium transition">重置</button>
+                        <button id="autoBtn" onclick="toggleAuto()"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium transition">自动播放</button>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mt-2">
+                        <button id="prevBtn" onclick="prevStep()"
+                            class="bg-slate-400 hover:bg-slate-500 text-white py-2 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed">上一步</button>
+                        <button id="stepBtn" onclick="nextStep()"
+                            class="bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition">下一步</button>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-slate-800 mb-3 text-sm uppercase">优先级参考</h3>
+                    <ul class="text-sm space-y-2 text-slate-600">
+                        <li class="flex justify-between font-bold text-red-600"><span>( )</span> <span
+                                class="bg-red-50 px-2 rounded text-xs leading-5">遇到 ) 立即清空到 ( </span></li>
+                        <li class="flex justify-between"><span>* /</span> <span
+                                class="bg-blue-100 text-blue-700 px-2 rounded text-xs leading-5">优先级 2</span></li>
+                        <li class="flex justify-between"><span>+ -</span> <span
+                                class="bg-orange-100 text-orange-700 px-2 rounded text-xs leading-5">优先级 1</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Right demo area -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Scan status -->
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-sm font-semibold text-slate-500 mb-4 uppercase">当前扫描</h3>
+                    <div id="charDisplay" class="flex flex-wrap items-center">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Stack container -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center">
+                        <h3 class="text-sm font-semibold text-slate-500 mb-4 uppercase w-full">符号栈 (Stack)</h3>
+                        <div
+                            class="relative w-24 min-h-[250px] border-x-4 border-b-4 border-slate-300 rounded-b-lg flex flex-col-reverse items-center p-2 bg-slate-50/50">
+                            <div id="stackContainer" class="w-full flex flex-col-reverse gap-1">
+                            </div>
+                            <span class="absolute -bottom-7 text-xs font-bold text-slate-400">栈底 (Bottom)</span>
+                        </div>
+                    </div>
+
+                    <!-- Output container -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="text-sm font-semibold text-slate-500 mb-4 uppercase">输出序列 (Output)</h3>
+                        <div id="outputContainer"
+                            class="p-4 bg-slate-800 text-emerald-400 font-mono text-xl rounded-lg min-h-[60px] break-all">
+                        </div>
+
+                        <div class="mt-8 p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                            <h4 class="text-sm font-bold text-blue-800 mb-1">执行说明:</h4>
+                            <p id="actionLog" class="text-sm text-blue-700 italic">点击“下一步”开始模拟...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let expression = "";
+        let currentIndex = -1;
+        let stack = [];
+        let output = "";
+        let history = [];
+        let autoTimer = null;
+
+        const precedence = {
+            '+': 1, '-': 1,
+            '*': 2, '/': 2,
+            '(': 0
+        };
+
+        function reset() {
+            clearInterval(autoTimer);
+            autoTimer = null;
+            document.getElementById('autoBtn').innerText = "自动播放";
+
+            expression = document.getElementById('expressionInput').value.replace(/\s+/g, '');
+            currentIndex = -1;
+            stack = [];
+            output = "";
+            history = [];
+            updateUI("就绪，准备扫描第一个字符。");
+        }
+
+        function saveHistory(msg) {
+            history.push({
+                currentIndex: currentIndex,
+                stack: [...stack],
+                output: output,
+                logMsg: msg
+            });
+        }
+
+        function prevStep() {
+            if (history.length <= 1) {
+                reset();
+                return;
+            }
+            history.pop();
+            const lastState = history[history.length - 1];
+            currentIndex = lastState.currentIndex;
+            stack = [...lastState.stack];
+            output = lastState.output;
+            updateUI(lastState.logMsg);
+        }
+
+        function nextStep() {
+            if (currentIndex >= expression.length - 1) {
+                if (stack.length > 0) {
+                    const op = stack.pop();
+                    output += op;
+                    saveHistory(`表达式处理结束，依次清空栈内剩余：弹出 ${op}`);
+                    updateUI(`弹出栈顶符号：${op}`);
+                    return;
+                }
+                updateUI("转换完成！");
+                clearInterval(autoTimer);
+                return;
+            }
+
+            currentIndex++;
+            const char = expression[currentIndex];
+            let logMsg = "";
+
+            if (/[a-zA-Z0-9]/.test(char)) {
+                output += char;
+                logMsg = `读入操作数 '${char}'，直接输出。`;
+            } else if (char === '(') {
+                stack。push(char);
+                logMsg = `读入 '('，直接入栈（作为内部运算的起点）。`;
+            } else if (char === ')') {
+                let popped = [];
+                while (stack.length > 0 && stack[stack.length - 1] !== '(') {
+                    let op = stack.pop();
+                    output += op;
+                    popped.push(op);
+                }
+                stack.pop(); // Pop '('
+                logMsg = `读入 ')'，弹出并输出括号内的：${popped.join(' ')}，并丢弃括号。`;
+            } else {
+                let popped = [];
+                while (stack.length > 0 &&
+                    stack[stack.length - 1] !== '(' &&
+                    precedence[stack[stack.length - 1]] >= precedence[char]) {
+                    let op = stack.pop();
+                    output += op;
+                    popped.push(op);
+                }
+                stack.push(char);
+                if (popped.length > 0) {
+                    logMsg = `读入 '${char}'，弹出优先级更高或同级的：${popped.join(' ')}，然后 '${char}' 入栈。`;
+                } else {
+                    logMsg = `读入运算符 '${char}'，优先级高于栈顶，直接入栈。`;
+                }
+            }
+
+            saveHistory(logMsg);
+            updateUI(logMsg);
+        }
+
+        function updateUI(log) {
+            document.getElementById('actionLog').innerText = log;
+            document.getElementById('outputContainer').innerText = output;
+            document.getElementById('prevBtn').disabled = history.length === 0;
+
+            const charContainer = document.getElementById('charDisplay');
+            charContainer.innerHTML = '';
+            for (let i = 0; i < expression.length; i++) {
+                const span = document.createElement('div');
+                span.className = `char-box border ${i === currentIndex ? 'highlight bg-amber-100 text-slate-800' : 'bg-slate-50 text-slate-400'}`;
+                span.innerText = expression[i];
+                charContainer.appendChild(span);
+            }
+
+            const stackContainer = document.getElementById('stackContainer');
+            stackContainer.innerHTML = '';
+            stack.forEach(op => {
+                const div = document.createElement('div');
+                div.className = "stack-item bg-blue-500 text-white w-full py-2 rounded text-center font-bold shadow-sm border border-blue-600";
+                div.innerText = op;
+                stackContainer.appendChild(div);
+            });
+        }
+
+        function toggleAuto() {
+            if (autoTimer) {
+                clearInterval(autoTimer);
+                autoTimer = null;
+                document.getElementById('autoBtn').innerText = "自动播放";
+            } else {
+                document.getElementById('autoBtn').innerText = "停止播放";
+                autoTimer = setInterval(nextStep, 1200);
+            }
+        }
+
+        window.onload = reset;
+    </script>
+</body>
+
+</html>
